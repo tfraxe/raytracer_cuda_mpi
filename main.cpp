@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cassert>
 
-float* run_raytracer(int, int, float*);
+float* run_raytracer(int, int, float*, int, float, float);
 float clamp(float, float, float);
 
 int main(int argc, char* argv[]) {
@@ -13,16 +13,16 @@ int main(int argc, char* argv[]) {
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &number_of_processes);
-    const int image_height = 400;
-    const int image_width = 600;
+    const float aspect_ratio = 3.0f / 2.0f;
+    const int image_width = 1200;
+    const int image_height = static_cast<int>((image_width / aspect_ratio)); 
     const int number_of_samples = 5;
     const int frame_buffer_size = 3 * image_height * image_width;
 
     float *sub_frame_buffer = (float*)malloc((frame_buffer_size / number_of_processes) * sizeof(float));
 
-    run_raytracer(rank + 1, number_of_processes, sub_frame_buffer);
+    run_raytracer(rank + 1, number_of_processes, sub_frame_buffer, image_width, aspect_ratio, number_of_samples);
     assert(sub_frame_buffer != NULL);
-    std::cout << "Process " << rank << " received frame buffer " << '\n';
 
     float* frame_buffer = NULL;
     if(rank == 0) {
@@ -30,11 +30,9 @@ int main(int argc, char* argv[]) {
         assert(frame_buffer != NULL);
     }
 
-    std::cout << "Process " << rank << " is gathering " << '\n';
     MPI_Gather(sub_frame_buffer, frame_buffer_size / number_of_processes, 
             MPI_FLOAT, frame_buffer, frame_buffer_size / number_of_processes, 
             MPI_FLOAT, 0, MPI_COMM_WORLD); 
-    std::cout << "Process " << rank << " is done gathering " << '\n';
 
     if (rank == 0) {
         std::cout << "P3\n" << image_width << ' ' << image_height << '\n' << "255\n";

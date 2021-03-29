@@ -156,12 +156,9 @@ __global__ void cleanup_scene(hittable** d_objects, hittable** d_world, camera**
     delete *d_cam;
 }
 
-void run_raytracer(int p_rank, int number_of_divisions, float* out_fb) {
+void run_raytracer(int p_rank, int number_of_divisions, float* out_fb, int image_width, float aspect_ratio, const float number_of_samples) {
 
-    const float aspect_ratio = 3.0f / 2.0f;
-    const int image_width = 600;
     const int image_height = static_cast<int>((image_width / aspect_ratio) * 1/number_of_divisions);
-    const float number_of_samples = 5.0f;
 
     
     hittable **d_objects, **d_world;
