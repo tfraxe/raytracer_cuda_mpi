@@ -176,36 +176,37 @@ void run_raytracer(int p_rank, int number_of_divisions, float* out_fb, int image
     curandState* d_rand_state2;
     checkCudaErrors(cudaMalloc(&d_rand_state2, 1*sizeof(curandState)));
 
-    rand_init<<<1, 1>>>(d_rand_state2);
+    cudaStream_t cuda0;
+    cudaStreamCreate(&cuda0);
+    std::cerr << "stream: " << cuda0 << '\n';
+
+    rand_init<<<1, 1, 0, cuda0>>>(d_rand_state2);
     checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(cuda0));
 
 
-    create_scene<<<1, 1>>>(d_objects, d_world, d_cam, aspect_ratio, p_rank, number_of_divisions, d_rand_state2);
+    create_scene<<<1, 1, 0, cuda0>>>(d_objects, d_world, d_cam, aspect_ratio, p_rank, number_of_divisions, d_rand_state2);
     checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(cuda0));
 
-    int threadsDim = 8;
+    int threadsDim = 32;
     dim3 numThreads(threadsDim, threadsDim);
     dim3 numBlocks((image_width / threadsDim) + 1, (image_height / threadsDim) + 1);
 
-    render_init_rand<<<numBlocks, numThreads>>>(image_height, image_width, d_rand_state);
+    render_init_rand<<<numBlocks, numThreads, 0, cuda0>>>(image_height, image_width, d_rand_state);
     checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(cuda0));
 
     
-    render<<<numBlocks,numThreads>>>(d_world, image_height, image_width, frame_buffer, number_of_samples, d_rand_state, d_cam);
+    render<<<numBlocks,numThreads, 0, cuda0>>>(d_world, image_height, image_width, frame_buffer, number_of_samples, d_rand_state, d_cam);
     checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkCudaErrors(cudaStreamSynchronize(cuda0));
 
-    cudaMemcpy(out_fb, frame_buffer, 3*image_height*image_width * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(out_fb, frame_buffer, 3*image_height*image_width * sizeof(float), cudaMemcpyDeviceToHost, cuda0);
 
-    checkCudaErrors(cudaDeviceSynchronize());
-    cleanup_scene<<<1, 1>>>(d_objects, d_world, d_cam);
+    checkCudaErrors(cudaStreamSynchronize(cuda0));
+    cleanup_scene<<<1, 1, 0, cuda0>>>(d_objects, d_world, d_cam);
     checkCudaErrors(cudaGetLastError());
-    checkCudaErrors(cudaFree(d_objects));
-    checkCudaErrors(cudaFree(d_world));
-    checkCudaErrors(cudaFree(frame_buffer));
     cudaDeviceReset();
 
 }
